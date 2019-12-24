@@ -29,7 +29,7 @@ class Generate extends Command
             ->addOption('ignoreFields', 'i', Option::VALUE_OPTIONAL, "忽略的字段，不生成搜索器")
             ->addOption('except', 'e', Option::VALUE_OPTIONAL, '要排除的table，多个用,隔开')
             ->addOption('type', null, Option::VALUE_OPTIONAL, "要生成的类型，多个用,隔开,如 m,v,c,p,s,d\n m -- model, v -- validate, c -- controller, p -- postmanJson, s -- searchAttr, d -- model doc")
-            ->addOption('templateDir', null, Option::VALUE_OPTIONAL, "自定义模板文件夹路径，必须有 model.tpl, controller.tpl, validate.tpl等文件，使用tp模板语法")
+            ->addOption('templateDir', null, Option::VALUE_OPTIONAL, "自定义模板文件夹路径，必须有 model.php, controller.php, validate.php等文件，使用PHP原生模板语法")
             ->addOption('mModule', null, Option::VALUE_OPTIONAL, "模型模块名")
             ->addOption('vModule', null, Option::VALUE_OPTIONAL, "校验器模块名")
             ->addOption('cModule', null, Option::VALUE_OPTIONAL, "控制器模块名")
@@ -863,7 +863,7 @@ EOF;
 
             // 更新 modelDoc
             if (in_array('d', $config['type'])) {
-                $path = $templateFile['model.tpl'];
+                $path = $templateFile['model.php'];
                 if ($config['dryRun']) {
                     if ($output->isDebug()) {
                         self::writeBlock($output, [
