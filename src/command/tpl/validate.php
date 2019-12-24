@@ -1,8 +1,8 @@
-namespace app\{$vModule}\validate{$vLayer|default=''};
+namespace app\<?=$vModule?>\validate<?=$vLayer?>;
 
-use {$vBase};
+use <?=$vBase?>;
 
-class {$modelName} extends {$vBaseName}
+class <?=$validateName?> extends <?=$vBaseName?>
 
 {
     /**
@@ -12,7 +12,7 @@ class {$modelName} extends {$vBaseName}
      * @var array
      */
     protected $rule = [
-        {$validateStr|raw}
+        <?=$validateStr?>
     ];
 
     /**

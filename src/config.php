@@ -71,6 +71,13 @@ return [
     // 控制器继承类
     'cBase'   => 'think\\Controller',
 
+    // 模型后缀
+    'mSuffix' => '',
+    // 校验器后缀
+    'vSuffix' => '',
+    // 控制器后缀
+    'cSuffix' => '',
+
     // 模型继承类名
     'mBaseName' => 'Model',
     // 校验器继承类名

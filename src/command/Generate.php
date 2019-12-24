@@ -1,19 +1,20 @@
 <?php
-namespace think\generator\command;
+namespace think\generate\command;
 
 use think\console\Command;
 use think\console\Input;
 use think\console\input\Option;
 use think\console\Output;
 use think\console\Table;
-use think\Container;
-use think\Db;
+use think\facade\Db;
 use think\facade\Config;
 use think\facade\Env;
-use think\Loader;
 
 class Generate extends Command
 {
+    public static $frameworkMainVersion = null;
+
+    public static $connectionName = '';
     /**
      * 配置
      *
@@ -22,7 +23,7 @@ class Generate extends Command
     protected function configure()
     {
         $this->setName('generate')
-            ->addOption('config', 'c', Option::VALUE_OPTIONAL, '配置名称，默认为 generator', 'generator')
+            ->addOption('config', 'c', Option::VALUE_OPTIONAL, '配置名称，默认为 generate', 'generate')
             ->addOption('table', 't', Option::VALUE_OPTIONAL, '要生成的table，多个用,隔开, 默认为所有table')
             ->addOption('tablePrefix', 'p', Option::VALUE_OPTIONAL, 'table前缀，多个用,隔开')
             ->addOption('ignoreFields', 'i', Option::VALUE_OPTIONAL, "忽略的字段，不生成搜索器")
@@ -35,15 +36,25 @@ class Generate extends Command
             ->addOption('mLayer', null, Option::VALUE_OPTIONAL, "模型分层")
             ->addOption('vLayer', null, Option::VALUE_OPTIONAL, "校验器分层")
             ->addOption('cLayer', null, Option::VALUE_OPTIONAL, "控制器分层")
-            ->addOption('mBase', null, Option::VALUE_OPTIONAL, "模型继承类，如 app\\common\\model\\EventModel")
+            ->addOption('mSuffix', null, Option::VALUE_OPTIONAL, "模型后缀")
+            ->addOption('vSuffix', null, Option::VALUE_OPTIONAL, "校验器后缀")
+            ->addOption('cSuffix', null, Option::VALUE_OPTIONAL, "控制器后缀")
+            ->addOption('mBase', null, Option::VALUE_OPTIONAL, "模型继承类，如 app\\common\\model\\BaseModel")
             ->addOption('vBase', null, Option::VALUE_OPTIONAL, "校验器继承")
             ->addOption('cBase', null, Option::VALUE_OPTIONAL, "控制器继承类")
+            ->addOption('businessException', null, Option::VALUE_OPTIONAL, "业务异常类")
             ->addOption('db', null, Option::VALUE_OPTIONAL, "数据库配置文件名")
             ->addOption('dryRun', 'd', Option::VALUE_OPTIONAL, "只执行，不保存", false)
             ->addOption('force', 'f', Option::VALUE_OPTIONAL, "覆盖已存在文件", false)
             ->addOption('pName', null, Option::VALUE_OPTIONAL, "PostMan 项目名称，默认使用 数据库名")
             ->addOption('pHost', null, Option::VALUE_OPTIONAL, "PostMan API请求前缀，默认使用 api_prefix 环境变量")
             ->setDescription('Auto generate model file');
+
+        if (version_compare(\think\App::VERSION, '5.1.0', '>=') && version_compare(\think\App::VERSION, '6.0.0', '<')) {
+            self::$frameworkMainVersion = 5;
+        } else {
+            self::$frameworkMainVersion = 6;
+        }
     }
 
     /**
@@ -123,6 +134,158 @@ class Generate extends Command
     }
 
     /**
+     * 获取框架配置
+     *
+     * @return array
+     */
+    public static function getFrameworkConfig()
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return Config::get('generate.');
+        } else {
+            return Config::get('generate');
+        }
+    }
+
+    /**
+     * 查询数据库
+    *
+    * @param string $query
+    * @param array $bindings
+    * @return mixed
+    */
+    public static function dbQuery(string $query, array $bindings = [])
+    {
+        if (self::$connectionName) {
+            return Db::connect(self::$connectionName)->query($query, $bindings);
+        } else {
+            return Db::query($query, $bindings);
+        }
+    }
+
+    /**
+     * 全大写
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function studly($value)
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return \think\Loader::parseName($value, 1);
+        }
+        return \think\helper\Str::studly($value);
+    }
+
+    /**
+     * 驼峰
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function camel($value)
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return \think\Loader::parseName($value, 1, false);
+        }
+        return \think\helper\Str::camel($value);
+    }
+
+    /**
+     * 蛇形
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function snake($value)
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return \think\Loader::parseName($value);
+        }
+        return \think\helper\Str::snake($value);
+    }
+
+    /**
+     * 获取app路径
+     *
+     * @return string
+     */
+    public static function appPath()
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return Env::get('app_path');
+        } else {
+            return \app_path();
+        }
+    }
+
+    /**
+     * 获取runtime路径
+     *
+     * @return string
+     */
+    public static function runtimePath()
+    {
+        if (self::$frameworkMainVersion == 5) {
+            return Env::get('runtime_path');
+        } else {
+            return \runtime_path();
+        }
+    }
+
+    /**
+     * 编译php模板文件
+     *
+     * @param string $templatePath
+     * @param array $context
+     * @return string
+     */
+    public static function compile($templatePath, $context)
+    {
+        extract($context);
+        ob_start();
+        include ($templatePath);
+        $res = ob_get_contents();
+        ob_end_clean();
+        return $res;
+    }
+
+    /**
+     * 获取数据库配置
+     *
+     * @return array|string
+     */
+    public static function getDbConfig($connectionName)
+    {
+        $config = [];
+        if (self::$frameworkMainVersion == 5) {
+            self::$connectionName = $connectionName;
+            $dbConfig = Config::get("database.");
+            // 解析数据库配置
+            if ($connectionName) {
+                $dbConfig     = Config::get("database.{$connectionName}.");
+                if (is_array($dbConfig)) {
+                    Db::init($dbConfig);
+                } else {
+                    return "数据库配置错误";
+                }
+            }
+
+            $config['databaseName'] = $dbConfig["database"];
+            $config['dbNamePrefix'] = '';
+        } else {
+            self::$connectionName = $connectionName;
+            $dbConfig = Config::get('database.connections.' . Config::get('database.default'));
+            if ($connectionName) {
+                $dbConfig = Config::get('database.connections.' . $connectionName);
+            }
+            $config['databaseName'] = $dbConfig["database"];
+            $config['dbNamePrefix'] = '';
+        }
+        return $config;
+    }
+
+    /**
      * 解析配置
      *
      * @param Input $input
@@ -149,7 +312,7 @@ class Generate extends Command
             'force'   => false,
 
             // 数据库配置
-            'dbConfigName' => 'database',
+            'dbConnectionName' => 'database',
             // 数据库名称
             'databaseName' => '',
             // 模型 表的数据库前缀
@@ -173,7 +336,7 @@ class Generate extends Command
             'createFieldMap' => ['createtime', 'create_time', 'createdtime', 'created_time', 'createat', 'create_at', 'createdat', 'created_at'],
             'updateFieldMap' => ['updatetime', 'update_time', 'updatedtime', 'updated_time', 'updateat', 'update_at', 'updatedat', 'updated_at'],
             'deleteFieldMap' => ['deletetime', 'delete_time', 'deletedtime', 'deleted_time', 'deleteat', 'delete_at', 'deletedat', 'deleted_at'],
-            'passwordFieldMap' => ['password', 'pwd', 'encrypt'],
+            'passwordFieldMap' => ['password', 'passwd', 'pwd', 'encrypt', 'salt'],
 
             'intFieldTypeList' => ['tinyint', 'smallint', 'mediumint', 'int', 'bigint', 'boolean', 'serial'],
             'floatFieldTypeList' => ['decimal', 'float', 'double', 'real'],
@@ -195,6 +358,13 @@ class Generate extends Command
             // 控制器分层
             'cLayer' => '',
 
+            // 模型后缀
+            'mSuffix' => '',
+            // 校验器后缀
+            'vSuffix' => '',
+            // 控制器后缀
+            'cSuffix' => '',
+
             // 模型继承类
             'mBase'   => 'think\\Model',
             // 校验器继承类
@@ -213,26 +383,21 @@ class Generate extends Command
             'projectName' => '',
             // postman api前缀
             'postmanAPIHost' => '{{api_prefix}}',
+
+            'businessException' => '\Exception',
+            'businessExceptionName' => 'Exception',
         ];
 
         // 加载配置文件
-        $commandConfig = Config::get('generator.');
-        $defaultConfig = array_merge($defaultConfig, $commandConfig ?: []);
+        $defaultConfig = array_merge($defaultConfig, self::getFrameworkConfig() ?: []);
 
         // 解析数据库配置
-        if ($input->hasOption('db')) {
-            $defaultConfig['dbConfigName'] = $input->getOption('db');
-            $dbConfig     = Config::get("{$defaultConfig['dbConfigName']}.");
-            if (is_array($dbConfig)) {
-                Db::init($dbConfig);
-            } else {
-                $output->writeln("\n\n数据库配置错误");
-                return;
-            }
+        $dbConfig = self::getDbConfig($input->hasOption('db') ? $input->getOption('db') : '');
+        if (!\is_array($dbConfig)) {
+            $output->writeln("\n\n" . $dbConfig);
+            return;
         }
-
-        $defaultConfig['databaseName'] = Config::get("{$defaultConfig['dbConfigName']}.database");
-        $defaultConfig['dbNamePrefix'] = $defaultConfig['databaseName'] == Config::get("database.database") ? '' : ($defaultConfig['databaseName'] . '.');
+        $defaultConfig = array_merge($defaultConfig, $dbConfig);
 
         $args = [
             // 要生成的表名
@@ -272,6 +437,13 @@ class Generate extends Command
             // 控制器分层
             'cLayer' => $input->hasOption('cLayer') ? $input->getOption('cLayer') : $defaultConfig['cLayer'],
 
+            // 模型后缀
+            'mSuffix' => $input->hasOption('mSuffix') ? $input->getOption('mSuffix') : $defaultConfig['mSuffix'],
+            // 校验器后缀
+            'vSuffix' => $input->hasOption('vSuffix') ? $input->getOption('vSuffix') : $defaultConfig['vSuffix'],
+            // 控制器后缀
+            'cSuffix' => $input->hasOption('cSuffix') ? $input->getOption('cSuffix') : $defaultConfig['cSuffix'],
+
             // 模型继承类
             'mBase'   => $input->hasOption('mBase') ? $input->getOption('mBase') : $defaultConfig['mBase'],
             // 校验器继承类
@@ -280,9 +452,11 @@ class Generate extends Command
             'cBase'   => $input->hasOption('cBase') ? $input->getOption('cBase') : $defaultConfig['cBase'],
 
             // postman 项目名
-            'projectName' => $input->hasOption('pName') ? $input->getOption('pName') : $defaultConfig['dbConfigName'],
+            'projectName' => $input->hasOption('pName') ? $input->getOption('pName') : $defaultConfig['databaseName'],
             // postman api前缀
             'postmanAPIHost' => $input->hasOption('pHost') ? $input->getOption('pHost') : $defaultConfig['postmanAPIHost'],
+
+            'businessException' => $input->hasOption('businessException') ? $input->getOption('businessException') : $defaultConfig['businessException'],
         ];
 
         if ($args['except']) {
@@ -323,6 +497,10 @@ class Generate extends Command
 
         if ($args['cBase']) {
             $args['cBaseName'] = substr(strrchr($args['cBase'], '\\'), 1);
+        }
+
+        if ($args['businessException']) {
+            $args['businessExceptionName'] = substr(strrchr($args['businessException'], '\\'), 1);
         }
 
         return array_merge($defaultConfig, $args);
@@ -386,7 +564,7 @@ class Generate extends Command
             $reflectionClass = new \ReflectionClass($config['cBase']);
             $config['baseControllerCorrect'] = $reflectionClass->hasConstant('LIST_ALL_DATA');
         }
-        $tableList = Db::query('SHOW TABLES');
+        $tableList = self::dbQuery('SHOW TABLES');
 
         $generatedList = [];
 
@@ -413,12 +591,12 @@ class Generate extends Command
                 continue;
             }
 
-            $tableColumns = Db::query('SELECT * FROM information_schema.columns WHERE table_schema = ? and table_name = ? ', [
+            $tableColumns = self::dbQuery('SELECT * FROM information_schema.columns WHERE table_schema = ? and table_name = ? ', [
                 $config['databaseName'],
                 $tableName,
             ]);
 
-            $tableDesc = Db::query('SELECT TABLE_COMMENT FROM information_schema.TABLES where table_schema = ? and table_name = ? ', [
+            $tableDesc = self::dbQuery('SELECT TABLE_COMMENT FROM information_schema.TABLES where table_schema = ? and table_name = ? ', [
                 $config['databaseName'],
                 $tableName,
             ]);
@@ -464,8 +642,11 @@ class Generate extends Command
             $hiddenField = [];
 
             // 模型名
-            $modelName = Loader::parseName(str_replace($config['tablePrefix'], '', $tableName), 1);
+            $modelName = self::studly(str_replace($config['tablePrefix'], '', $tableName));
             $modelInstanceName = lcfirst($modelName . 'Instance');
+            $modelFullName = $modelName . $config['mSuffix'];
+            $validateFullName = $modelName . $config['vSuffix'];
+            $controllerFullName = $modelName . $config['cSuffix'];
 
             // 模型注释
             $modelDoc = '';
@@ -484,7 +665,7 @@ class Generate extends Command
                 $modelDoc .= " * @property {$field['DATA_TYPE_IN_PHP']} \${$field['COLUMN_NAME']} {$field['COLUMN_COMMENT']}\r\n";
 
                 $name                       = $field['COLUMN_NAME'];
-                $field['COLUMN_NAME_UPPER'] = Loader::parseName($name, 1);
+                $field['COLUMN_NAME_UPPER'] = self::studly($name, 1);
                 if ($field['COLUMN_KEY'] == 'PRI') {
                     $pk = $name;
                     $updateFieldStr .= "'{$name}' => \$id,\n";
@@ -499,10 +680,6 @@ class Generate extends Command
 
                     if (in_array($field['DATA_TYPE'], $config['intFieldTypeList'])) {
                         $validateValue .= "|number";
-                    }
-
-                    if ($validateValue) {
-                        $validate[$validateKey] = ltrim($validateValue, '|');
                     }
 
                     // 判断时间字段
@@ -537,6 +714,10 @@ class Generate extends Command
                     // 时间戳字段和忽略字段以外的加入更新参数
                     if (!$isTimeField && !$isIgnored) {
                         $updateFieldStr .= "'{$name}' => \${$modelInstanceName}->{$name},\n";
+
+                        if ($validateValue) {
+                            $validate[$validateKey] = ltrim($validateValue, '|');
+                        }
                     }
                     // 密码字段不需要搜索
                     if (self::arrayLikeCase($name, $config['passwordFieldMap']) !== false) {
@@ -608,19 +789,21 @@ class Generate extends Command
  *
 $modelDoc */
 EOF;
-
             // 生成模型、校验器、控制器
-            $view = Container::get('view');
             $data = [
                 'pk'               => $pk,
                 'tableName'        => $tableName,
                 'tableDesc'        => $tableDesc,
                 'tableColumns'     => $tableColumns,
                 'modelDoc'         => $modelDoc,
-                'modelName'        => $modelName,
+                'modelName'        => $modelFullName,
                 'modelAlias'       => $modelName . 'Model',
                 'modelInstance'    => $modelInstanceName,
+                'validateName'     => $validateFullName,
                 'validateAlias'    => $modelName . 'Validate',
+                'modelNSAlias'     => $config['mSuffix'] == 'Model' ? '' : (' as ' . $modelName . 'Model'),
+                'validateNSAlias'  => $config['vSuffix'] == 'Validate'  ? '' : (' as ' . $modelName . 'Validate'),
+                'controllerName'   => $controllerFullName,
                 'createTime'       => $createTime,
                 'updateTime'       => $updateTime,
                 'deleteTime'       => $deleteTime,
@@ -636,7 +819,7 @@ EOF;
                 'hiddenFieldStr'   => $hiddenFieldStr,
                 'readonlyFieldStr' => $readonlyFieldStr,
             ];
-            $view->assign(array_merge($config, $data));
+            $context = array_merge($config, $data);
 
             $templateDir = $config['templateDir'] ?: __DIR__ . DIRECTORY_SEPARATOR . 'tpl' . DIRECTORY_SEPARATOR;
 
@@ -645,9 +828,9 @@ EOF;
             $cLayerDir = str_replace('\\', '/', $config['cLayer']);
 
             $templateFile = [
-                'model.tpl'      => Env::get('app_path') . $config['mModule'] . "/model{$mLayerDir}/{$modelName}.php",
-                'controller.tpl' => Env::get('app_path') . $config['cModule'] . "/controller{$cLayerDir}/{$modelName}.php",
-                'validate.tpl'   => Env::get('app_path') . $config['vModule'] . "/validate{$vLayerDir}/{$modelName}.php",
+                'model.php'      => self::appPath() . $config['mModule'] . "/model{$mLayerDir}/{$modelFullName}.php",
+                'controller.php' => self::appPath() . $config['cModule'] . "/controller{$cLayerDir}/{$controllerFullName}.php",
+                'validate.php'   => self::appPath() . $config['vModule'] . "/validate{$vLayerDir}/{$validateFullName}.php",
             ];
             if ($output->isDebug()) {
                 self::writeBlock($output, [
@@ -656,11 +839,12 @@ EOF;
                     json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
                 ]);
             }
+            $generateResult['modelName'] = $modelName;
             foreach ($templateFile as $tpl => $path) {
                 if (!in_array($tpl[0], $config['type'])) {
                     continue;
                 }
-                $content = $view->fetch($templateDir . $tpl);
+                $content = self::compile($templateDir . $tpl, $context);
                 if (is_file($path) && !$config['force']) {
                     $generateResult[$tpl[0]] = 'File exists';
                     continue;
@@ -681,7 +865,7 @@ EOF;
             if (in_array('d', $config['type'])) {
                 $path = $templateFile['model.tpl'];
                 if ($config['dryRun']) {
-                    if ($output->isVerbose()) {
+                    if ($output->isDebug()) {
                         self::writeBlock($output, [
                             $tableName . " modelDoc:",
                             $modelDoc
@@ -709,7 +893,7 @@ EOF;
                     $generateResult['d'] = 'Updated';
                 } else {
                     $generateResult['d'] = 'File not exists';
-                    if ($output->isVerbose()) {
+                    if ($output->isDebug()) {
                         self::writeBlock($output, [
                             $tableName . " modelDoc:",
                             $modelDoc
@@ -723,11 +907,11 @@ EOF;
                 $postmanAPI['item'][] = [
                     'name' => $modelName,
                     'item' => [
-                        self::generatePostmanRequest($modelName . '列表', 'GET', $config['postmanAPIHost'], '/Index/' . $modelName . '/index'),
-                        self::generatePostmanRequest('查看' . $modelName, 'GET', $config['postmanAPIHost'], '/Index/' . $modelName . '/read?id=1'),
-                        self::generatePostmanRequest('新增' . $modelName, 'POST', $config['postmanAPIHost'], '/Index/' . $modelName . '/save', $defaultFields),
-                        self::generatePostmanRequest('编辑' . $modelName, 'POST', $config['postmanAPIHost'], '/Index/' . $modelName . '/update', array_merge($defaultFields, ['id' => 1])),
-                        self::generatePostmanRequest('删除' . $modelName, 'POST', $config['postmanAPIHost'], '/Index/' . $modelName . '/delete', ['id' => [1]]),
+                        self::generatePostmanRequest($modelName . '列表', 'GET', $config['postmanAPIHost'], '/' . $config['cModule'] . '/' . self::snake($modelName) . '/index'),
+                        self::generatePostmanRequest('查看' . $modelName, 'GET', $config['postmanAPIHost'], '/' . $config['cModule'] . '/' . self::snake($modelName) . '/read?id=1'),
+                        self::generatePostmanRequest('新增' . $modelName, 'POST', $config['postmanAPIHost'], '/' . $config['cModule'] . '/' . self::snake($modelName) . '/save', $defaultFields),
+                        self::generatePostmanRequest('编辑' . $modelName, 'POST', $config['postmanAPIHost'], '/' . $config['cModule'] . '/' . self::snake($modelName) . '/update', array_merge(['id' => 1], $defaultFields)),
+                        self::generatePostmanRequest('删除' . $modelName, 'POST', $config['postmanAPIHost'], '/' . $config['cModule'] . '/' . self::snake($modelName) . '/delete', ['id' => [1]]),
                     ],
                 ];
             }
@@ -745,13 +929,12 @@ EOF;
 
         // 生成 postman API 文件
         if (in_array('p', $config['type'])) {
-            $resultTable[0][] = 'Postman';
-            $path = Env::get('app_path') . "{$config['projectName']}.postman_collection.json";
+            $path = self::runtimePath() . "{$config['projectName']}.postman_collection.json";
             if (is_file($path) && !$config['force']) {
                 $tip = 'File exists';
             } else {
                 if ($config['dryRun']) {
-                    if ($output->isVerbose()){
+                    if ($output->isDebug()){
                         self::writeBlock($output, [
                             "Postman API JSON:",
                             json_encode($postmanAPI, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
@@ -763,18 +946,17 @@ EOF;
                     $tip = 'Generated';
                 }
             }
-            $resultTable[1][] = $tip;
+            $resultTable[] = ['Postman', $tip, $path];
         }
 
         // 生成搜索器字段
         if (in_array('s', $config['type'])) {
-            $resultTable[0][] = 'SearchFields';
-            $path = Env::get('app_path') . "{$config['projectName']}.searchFields.json";
+            $path = self::runtimePath() . "{$config['projectName']}.searchFields.json";
             if (is_file($path) && !$config['force']) {
                 $tip = 'File exists';
             } else {
                 if ($config['dryRun']) {
-                    if ($output->isVerbose()){
+                    if ($output->isDebug()){
                         self::writeBlock($output, [
                             "SearchFields JSON:",
                             json_encode($searchFieldMapAll, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
@@ -786,25 +968,21 @@ EOF;
                     $tip = 'Generated';
                 }
             }
-            $resultTable[1][] = $tip;
+            $resultTable[] = ['SearchFields', $tip, $path];
         }
 
         $typeLang = [
             // 'm' => '模型',
             // 'v' => '校验器',
             // 'c' => '控制器',
-            // 'p' => 'Postman接口',
-            // 's' => '搜索器',
             // 'd' => '模型注释',
             'm' => 'Model',
             'v' => 'Validate',
             'c' => 'Controller',
-            // 'p' => 'Postman',
-            // 's' => 'SearchFields',
             'd' => 'ModelDoc',
         ];
 
-        $header = ['Table'];
+        $header = ['Table', 'Name'];
         foreach ($config['type'] as $type) {
             if (isset($typeLang[$type])) {
                 $header[] = $typeLang[$type];
@@ -813,7 +991,7 @@ EOF;
 
         $rows = [];
         foreach ($generatedList as $one) {
-            $row = [$one['table']];
+            $row = [$one['table'], $one['modelName']];
             foreach ($config['type'] as $type) {
                 if (isset($typeLang[$type])) {
                     $row[] = $one[$type] ?? '';
@@ -829,8 +1007,8 @@ EOF;
 
         if ($resultTable) {
             $table2 = new Table();
-            $table2->setHeader($resultTable[0]);
-            $table2->setRows(array_slice($resultTable, 1));
+            $table2->setHeader(['Type', 'Status', 'Path']);
+            $table2->setRows($resultTable);
             $this->table($table2);
         }
     }

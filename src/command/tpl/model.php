@@ -1,49 +1,61 @@
-namespace app\{$mModule}\model{$mLayer|default=''};
+namespace app\<?=$mModule?>\model<?=$mLayer?>;
 
-use {$mBase};
+use <?=$mBase?>;
 
-{$modelDoc}
+<?=$modelDoc?>
 
-class {$modelName} extends {$mBaseName}
+class <?=$modelName?> extends <?=$mBaseName?>
 
 {
     /**
      * 数据表名称
      * @var string
      */
-    const TABLE = '{$dbNamePrefix}{$tableName}';
-
-    /**
-     * 数据表插入时间字段
-     * @var string
-     */
-    const CREATE_TIME_FIELD = '{$createTime}';
-
-    /**
-     * 数据表更新时间字段
-     * @var string
-     */
-    const UPDATE_TIME_FIELD = '{$updateTime}';
-
-    /**
-     * 数据表删除时间字段
-     * @var string
-     */
-    const DELETE_TIME_FIELD = '{$deleteTime}';
-
-    /**
-     * 数据表名称
-     * @var string
-     */
-    protected $table = '{$dbNamePrefix}{$tableName}';
+    const TABLE = '<?=$dbNamePrefix?><?=$tableName?>';
 
     /**
      * 数据表主键 复合主键使用数组定义
      * @var string|array
      */
-    protected $pk = '{$pk}';
+    const PRIMARY_KEY = '<?=$pk?>';
 
-    {if $autoTime}
+    <?php if ($createTime){ ?>
+    /**
+     * 数据表插入时间字段
+     * @var string
+     */
+    const CREATED_AT = '<?=$createTime?>';
+    <?php }?>
+
+    <?php if ($updateTime){ ?>
+    /**
+     * 数据表更新时间字段
+     * @var string
+     */
+    const UPDATED_AT = '<?=$updateTime?>';
+    <?php }?>
+
+    <?php if ($deleteTime){ ?>
+    /**
+     * 数据表删除时间字段
+     * @var string
+     */
+    const DELETED_AT = '<?=$deleteTime?>';
+    <?php }?>
+
+    /**
+     * 数据表名称
+     * @var string
+     */
+    protected $table = '<?=$dbNamePrefix?><?=$tableName?>';
+
+    /**
+     * 数据表主键 复合主键使用数组定义
+     * @var string|array
+     */
+    protected $pk = '<?=$pk?>';
+
+    <?php if ($autoTime){ ?>
 
     /**
      * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型
@@ -55,35 +67,29 @@ class {$modelName} extends {$mBaseName}
      * 创建时间字段 false表示关闭
      * @var false|string
      */
-    protected $createTime = '{$createTime}';
+    protected $createTime = '<?=$createTime?>';
 
     /**
      * 更新时间字段 false表示关闭
      * @var false|string
      */
-    protected $updateTime = '{$updateTime}';
-    {/if}
+    protected $updateTime = '<?=$updateTime?>';
+    <?php }?>
 
-    {if $deleteTime}
+    <?php if ($deleteTime){ ?>
 
     /**
      * 软删除字段 false表示关闭
      * @var false|string
      */
-    protected $deleteTime = '{$deleteTime}';
-    {/if}
+    protected $deleteTime = '<?=$deleteTime?>';
+    <?php }?>
 
     /**
      * 搜索字段
      * @var array
      */
-    public static $searchFields = [{$searchFieldStr}];
-
-    /**
-     * 写入自动完成定义
-     * @var array
-     */
-    protected $auto = [];
+    public static $searchFields = [<?=$searchFieldStr?>];
 
     /**
      * 全局查询范围
@@ -91,75 +97,74 @@ class {$modelName} extends {$mBaseName}
      */
     protected $globalScope = [];
 
-
-    {foreach $varcharField as $field }
+    <?php foreach ($varcharField as $field) { ?>
 
     /**
-     * {$field.COLUMN_COMMENT} 查询器
+     * <?=$field['COLUMN_COMMENT']?> 查询器
      *
-     * @param think\db\Query $query 查询对象
+     * @param \think\db\Query $query 查询对象
      * @param mixed $value 对应字段值
      * @param mixed $data 数据
      * @return void
      */
-    public function search{$field.COLUMN_NAME_UPPER}Attr($query, $value, $data)
+    public function search<?=$field['COLUMN_NAME_UPPER']?>Attr($query, $value, $data)
     {
         if(is_null($value)){
             return;
         }
-        $this->searchVarCharAttr($query, '{$field.COLUMN_NAME}', $value);
+        $this->searchVarCharAttr($query, '<?=$field['COLUMN_NAME']?>', $value);
     }
 
-    {/foreach}
+    <?php }?>
 
-    {foreach $enumField as $field }
+    <?php foreach ($enumField as $field) { ?>
 
     /**
-     * {$field.COLUMN_COMMENT} 查询器
+     * <?=$field['COLUMN_COMMENT']?> 查询器
      *
-     * @param think\db\Query $query 查询对象
+     * @param \think\db\Query $query 查询对象
      * @param mixed $value 对应字段值
      * @param mixed $data 数据
      * @return void
      */
-    public function search{$field.COLUMN_NAME_UPPER}Attr($query, $value, $data)
+    public function search<?=$field['COLUMN_NAME_UPPER']?>Attr($query, $value, $data)
     {
         if(is_null($value)){
             return;
         }
-        $this->searchEnumAttr($query, '{$field.COLUMN_NAME}', $value);
+        $this->searchEnumAttr($query, '<?=$field['COLUMN_NAME']?>', $value);
     }
 
-    {/foreach}
+    <?php }?>
 
-    {foreach $numberField as $field }
+    <?php foreach ($numberField as $field) { ?>
 
     /**
-     * {$field.COLUMN_COMMENT} 查询器
+     * <?=$field['COLUMN_COMMENT']?> 查询器
      *
-     * @param think\db\Query $query 查询对象
+     * @param \think\db\Query $query 查询对象
      * @param mixed $value 对应字段值
      * @param mixed $data 数据
      * @return void
      */
-    public function search{$field.COLUMN_NAME_UPPER}Attr($query, $value, $data)
+    public function search<?=$field['COLUMN_NAME_UPPER']?>Attr($query, $value, $data)
     {
         if(is_null($value)){
             return;
         }
-        $this->searchNumberZoneAttr($query, '{$field.COLUMN_NAME}', $value);
+        $this->searchNumberZoneAttr($query, '<?=$field['COLUMN_NAME']?>', $value);
     }
 
-    {/foreach}
+    <?php }?>
 
 
 
-    {if !$baseModelCorrect}
+    <?php if(!$baseModelCorrect){ ?>
 
     /**
      * 创建时间查询器
      *
-     * @param think\db\Query $query 查询对象
+     * @param \think\db\Query $query 查询对象
      * @param mixed $value 对应字段值
      * @param mixed $data 数据
      * @return void
@@ -169,16 +174,16 @@ class {$modelName} extends {$mBaseName}
         if (is_null($value)) {
             return;
         }
-        if (!$this->createTime) {
+        if (!defined('static::CREATED_AT')) {
             return;
         }
-        $this->searchTimestampAttr($query, $this->createTime, $value);
+        $this->searchTimestampAttr($query, static::CREATED_AT, $value);
     }
 
     /**
      * 更新时间查询器
      *
-     * @param think\db\Query $query 查询对象
+     * @param \think\db\Query $query 查询对象
      * @param mixed $value 对应字段值
      * @param mixed $data 数据
      * @return void
@@ -188,10 +193,10 @@ class {$modelName} extends {$mBaseName}
         if (is_null($value)) {
             return;
         }
-        if (!$this->updateTime) {
+        if (!defined('static::UPDATED_AT')) {
             return;
         }
-        $this->searchTimestampAttr($query, $this->updateTime, $value);
+        $this->searchTimestampAttr($query, static::UPDATED_AT, $value);
     }
 
     /**
@@ -206,12 +211,12 @@ class {$modelName} extends {$mBaseName}
     public function searchVarCharAttr($query, $field, $value)
     {
         if (is_string($value)) {
-            $query->where($field, '=', $value);
+            $query->where(static::TABLE . '.' . $field, '=', $value);
         } else if (is_array($value)) {
             if ($value[0] === 'like' && isset($value[1])) {
-                $query->where($field, 'like', $value[1]);
+                $query->where(static::TABLE . '.' . $field, 'like', $value[1]);
             } else {
-                $query->whereIn($field, $value);
+                $query->whereIn(static::TABLE . '.' . $field, $value);
             }
         }
     }
@@ -232,18 +237,18 @@ class {$modelName} extends {$mBaseName}
     {
         if (!is_array($value)) {
             if ($value === 0 || $value === '0') {
-                $query->where($field, '=', 0);
+                $query->where(static::TABLE . '.' . $field, '=', 0);
             } else {
                 if (is_string($value)) {
                     $value = strtotime($value) ?: $value;
                 }
-                $query->where($field, '=', $value);
+                $query->where(static::TABLE . '.' . $field, '=', $value);
             }
         } else if (count($value) == 1) {
             if (is_string($value[0])) {
                 $value[0] = strtotime($value[0]) ?: $value[0];
             }
-            $query->where($field, '>=', $value[0]);
+            $query->where(static::TABLE . '.' . $field, '>=', $value[0]);
         } else if (count($value) > 1) {
             if (is_string($value[0])) {
                 $value[0] = strtotime($value[0]) ?: $value[0];
@@ -251,7 +256,7 @@ class {$modelName} extends {$mBaseName}
             if (is_string($value[1])) {
                 $value[1] = strtotime($value[1]) ?: $value[1];
             }
-            $query->whereBetween($field, $value);
+            $query->whereBetween(static::TABLE . '.' . $field, $value);
         }
     }
 
@@ -269,11 +274,11 @@ class {$modelName} extends {$mBaseName}
     public function searchNumberZoneAttr($query, $field, $value)
     {
         if (!is_array($value)) {
-            $query->where($field, '=', $value);
+            $query->where(static::TABLE . '.' . $field, '=', $value);
         } else if (count($value) == 1) {
-            $query->where($field, '>=', $value[0]);
+            $query->where(static::TABLE . '.' . $field, '>=', $value[0]);
         } else if (count($value) > 1) {
-            $query->whereBetween($field, $value);
+            $query->whereBetween(static::TABLE . '.' . $field, $value);
         }
     }
 
@@ -290,9 +295,9 @@ class {$modelName} extends {$mBaseName}
     public function searchEnumAttr($query, $field, $value)
     {
         if (!is_array($value)) {
-            $query->where($field, '=', (int) $value);
+            $query->where(static::TABLE . '.' . $field, '=', (int) $value);
         } else {
-            $query->whereIn($field, $value);
+            $query->whereIn(static::TABLE . '.' . $field, $value);
         }
     }
 
@@ -321,6 +326,6 @@ class {$modelName} extends {$mBaseName}
         }
     }
 
-    {/if}
+    <?php }?>
 
 }
