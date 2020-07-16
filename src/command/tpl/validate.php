@@ -1,4 +1,4 @@
-namespace app\<?=$vModule?>\validate<?=$vLayer?>;
+namespace app<?=$vModule?>\validate<?=$vLayer?>;
 
 use <?=$vBase?>;
 

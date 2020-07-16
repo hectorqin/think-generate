@@ -89,4 +89,13 @@ return [
     'projectName' => '',
     // postman api前缀
     'postmanAPIHost' => '{{api_prefix}}',
+
+    // 业务异常类
+    'businessException' => '\Exception',
+
+    // 错误常量类
+    'errorCode' => '\\app\\common\\ErrorCode',
+
+    // 英文单词复数转单数闭包函数
+    'singularHandler' => null,
 ];

@@ -4,17 +4,174 @@
 
 ## 框架要求
 
-ThinkPHP5.1+
+ThinkPHP5.1+ 及 ThinkPHP6
 
 ## 安装
 
 ~~~ bash
-composer require hectorqin/thinkphp-generator
+composer require hectorqin/think-generate
 ~~~
 
 ## 配置
 
 修改项目根目录下config/generator.php中对应的参数
+
+### 自动生成控制器需要的类
+
+#### BusinessException 业务异常类
+
+~~~php
+<?php
+
+namespace app\exception;
+
+use Throwable;
+use app\constants\ErrorCode;
+
+class BusinessException extends \RuntimeException
+{
+    /**
+     * 额外信息
+     *
+     * @var array|object
+     */
+    protected $data;
+
+    public function __construct(int $code = 0, string $message = null, Throwable $previous = null)
+    {
+        if (!is_null($previous) && $previous instanceof static ) {
+            $code    = $previous->getCode();
+            $message = $previous->getMessage() ?: null;
+        }
+
+        if (is_null($message)) {
+            $message = ErrorCode::$allCode[$code] ?? '';
+        }
+
+        parent::__construct($message, $code, $previous);
+    }
+}
+~~~
+
+#### errorCode 错误常量类
+
+~~~php
+<?php
+namespace app\constants;
+
+use ReflectionMethod;
+use think\facade\Log;
+use app\exception\BusinessException;
+
+class ErrorCode
+{
+    /**
+     * 系统错误
+     */
+    const SYSTEM_ERROR = 1000;
+
+    /**
+     * 参数错误、参数未通过校验
+     */
+    const ARGS_WRONG = 1001;
+
+    /**
+     * 数据库操作出错，新增、编辑、删除失败
+     */
+    const DB_WRONG = 1002;
+
+    /**
+     * 未查询到相关数据
+     */
+    const DATA_NOT_FOUND = 1003;
+
+    /**
+     * 操作不允许
+     */
+    const OPERATING_NOT_PERMIT = 1004;
+
+    /**
+     * 操作失败
+     */
+    const OPERATION_FAILED = 1005;
+
+    /**
+     * 未授权
+     */
+    const OPERATING_UNAUTHORIZED = 1007;
+
+    /**
+     * 所有的code
+     *
+     * @var array
+     */
+    public static $allCode = [
+        self::SYSTEM_ERROR           => '系统错误',
+        self::ARGS_WRONG             => '参数错误',
+        self::DB_WRONG               => '数据库操作出错',
+        self::DATA_NOT_FOUND         => '未查询到相关数据',
+        self::OPERATING_NOT_PERMIT   => '非法操作',
+        self::OPERATION_FAILED       => '操作失败',
+        self::OPERATING_UNAUTHORIZED => '未授权',
+    ];
+
+    /**
+     * 获取返回的error message
+     *
+     * @return mixed
+     */
+    public static function getErrorMessage($exception = null, $default = [])
+    {
+        $default = is_array($default) ? $default : ($default ? [$default] : []);
+        if (!is_null($exception) && method_exists($exception, 'getTraceAsString')) {
+            if (!($exception instanceof BusinessException)) {
+                Log::emergency($exception->getTraceAsString());
+            }
+        }
+        if ($exception instanceof \TypeError) {
+            $errorMsg = $exception->getMessage();
+            // Argument 1 passed to app\index\controller\smpss\SmpssSales::tenancyBack() must be of the type string, array given in /Users/hector/htdocs/ws/bkadmin-api/application/index/controller/smpss/Smpsssales.php:182
+            $matches = [];
+            if (preg_match('/Argument (\d+) passed to ([^\s]+)\(\)/', $errorMsg, $matches)) {
+                // $trace = $exception->getTrace();
+                // $lastFunc = $trace[0];
+                // $reflect    = new ReflectionMethod($lastFunc['class'], $lastFunc['function']);
+                $reflect    = new ReflectionMethod(...explode('::', $matches[2]));
+                $parameters = $reflect->getParameters();
+                if (isset($parameters[$matches[1] - 1])) {
+                    $arg   = $parameters[$matches[1] - 1];
+                    $error = [
+                        'errorCode' => 'ARGS_WRONG',
+                        'errorArgs' => $arg->name,
+                        'errorMsg'  => "参数 " . $arg->name . " 必须为 " . $arg->getType() . " 类型",
+                    ];
+                    return array_merge($default, $error);
+                }
+            }
+        }
+        if ($exception instanceof \InvalidArgumentException) {
+            // method param miss:backNumMap
+            $errorMsg = $exception->getMessage();
+            $matches  = [];
+            if (preg_match('/method param miss:(\w+)/', $errorMsg, $matches)) {
+                $error = [
+                    'errorCode' => 'ARGS_WRONG',
+                    'errorArgs' => $matches[1],
+                    'errorMsg'  => "参数 " . $matches[1] . " 为必填项",
+                ];
+                return array_merge($default, $error);
+            }
+        }
+        if (!is_null($exception) && method_exists($exception, 'getMessage')) {
+            $error = [
+                'errorMsg' => $exception->getMessage(),
+            ];
+            return array_merge($default, $error);
+        }
+        return $default;
+    }
+}
+~~~
 
 ## 使用
 

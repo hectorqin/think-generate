@@ -1,4 +1,4 @@
-namespace app\<?=$mModule?>\model<?=$mLayer?>;
+namespace app<?=$mModule?>\model<?=$mLayer?>;
 
 use <?=$mBase?>;
 

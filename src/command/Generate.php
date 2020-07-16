@@ -15,6 +15,8 @@ class Generate extends Command
     public static $frameworkMainVersion = null;
 
     public static $connectionName = '';
+
+    private static $config;
     /**
      * 配置
      *
@@ -161,6 +163,19 @@ class Generate extends Command
         } else {
             return Db::query($query, $bindings);
         }
+    }
+
+    /**
+     * 复数转单数
+     * @param mixed $value
+     * @return string
+     */
+    public static function singular($value)
+    {
+        if (self::$config['singularHandler']) {
+            $value = \call_user_func_array(self::$config['singularHandler'], [$value]);
+        }
+        return $value;
     }
 
     /**
@@ -384,8 +399,16 @@ class Generate extends Command
             // postman api前缀
             'postmanAPIHost' => '{{api_prefix}}',
 
+            // 业务异常类
             'businessException' => '\Exception',
+            // 业务异常类名
             'businessExceptionName' => 'Exception',
+
+            // 错误常量类
+            'errorCode' => '\\app\\common\\ErrorCode',
+
+            // 英文单词复数转单数闭包函数
+            'singularHandler' => null,
         ];
 
         // 加载配置文件
@@ -456,7 +479,11 @@ class Generate extends Command
             // postman api前缀
             'postmanAPIHost' => $input->hasOption('pHost') ? $input->getOption('pHost') : $defaultConfig['postmanAPIHost'],
 
+            // 业务异常类
             'businessException' => $input->hasOption('businessException') ? $input->getOption('businessException') : $defaultConfig['businessException'],
+
+            // 错误常量类
+            'errorCode' => $input->hasOption('errorCode') ? $input->getOption('errorCode') : $defaultConfig['errorCode'],
         ];
 
         if ($args['except']) {
@@ -503,7 +530,8 @@ class Generate extends Command
             $args['businessExceptionName'] = substr(strrchr($args['businessException'], '\\'), 1);
         }
 
-        return array_merge($defaultConfig, $args);
+        self::$config = array_merge($defaultConfig, $args);
+        return self::$config;
     }
 
     /**
@@ -642,7 +670,7 @@ class Generate extends Command
             $hiddenField = [];
 
             // 模型名
-            $modelName = self::studly(str_replace($config['tablePrefix'], '', $tableName));
+            $modelName = self::studly(self::singular(str_replace($config['tablePrefix'], '', $tableName)));
             $modelInstanceName = lcfirst($modelName . 'Instance');
             $modelFullName = $modelName . $config['mSuffix'];
             $validateFullName = $modelName . $config['vSuffix'];
@@ -797,11 +825,11 @@ EOF;
                 'tableColumns'     => $tableColumns,
                 'modelDoc'         => $modelDoc,
                 'modelName'        => $modelFullName,
-                'modelAlias'       => $modelName . 'Model',
+                'modelAlias'       => ($config['vSuffix'] && $config['cSuffix']) ? $modelFullName : ($modelName . 'Model'),
                 'modelInstance'    => $modelInstanceName,
                 'validateName'     => $validateFullName,
-                'validateAlias'    => $modelName . 'Validate',
-                'modelNSAlias'     => $config['mSuffix'] == 'Model' ? '' : (' as ' . $modelName . 'Model'),
+                'validateAlias'    => $config['vSuffix'] ? $validateFullName : ($modelName . 'Validate'),
+                'modelNSAlias'     => ($config['mSuffix'] == 'Model' || ($config['vSuffix'] && $config['cSuffix'])) ? '' : (' as ' . $modelName . 'Model'),
                 'validateNSAlias'  => $config['vSuffix'] == 'Validate'  ? '' : (' as ' . $modelName . 'Validate'),
                 'controllerName'   => $controllerFullName,
                 'createTime'       => $createTime,
@@ -819,7 +847,11 @@ EOF;
                 'hiddenFieldStr'   => $hiddenFieldStr,
                 'readonlyFieldStr' => $readonlyFieldStr,
             ];
-            $context = array_merge($config, $data);
+            $context = array_merge($config, $data, [
+                'mModule' => $config['mModule'] ? ('/' . $config['mModule']) : '',
+                'cModule' => $config['cModule'] ? ('/' . $config['cModule']) : '',
+                'vModule' => $config['vModule'] ? ('/' . $config['vModule']) : '',
+            ]);
 
             $templateDir = $config['templateDir'] ?: __DIR__ . DIRECTORY_SEPARATOR . 'tpl' . DIRECTORY_SEPARATOR;
 

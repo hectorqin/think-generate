@@ -1,9 +1,9 @@
-namespace app\<?=$cModule?>\controller<?=$cLayer?>;
+namespace app<?=$cModule?>\controller<?=$cLayer?>;
 
 use <?=$cBase?>;
-use app\<?=$mModule?>\model<?=$mLayer?>\<?=$modelName?><?=$modelNSAlias?>;
-use app\<?=$vModule?>\validate<?=$vLayer?>\<?=$validateName?><?=$validateNSAlias?>;
-use app\common\ErrorCode;
+use app<?=$mModule?>\model<?=$mLayer?>\<?=$modelName?><?=$modelNSAlias?>;
+use app<?=$vModule?>\validate<?=$vLayer?>\<?=$validateName?><?=$validateNSAlias?>;
+use <?=$errorCode?>;
 use think\exception\ValidateException;
 use <?=$businessException?>;
 use think\facade\Db;
@@ -28,15 +28,15 @@ class <?=$controllerName?> extends <?=$cBaseName?>
     {
         $page     = $this->request->param('page/d', 1);
         if($page < 1){
-            return $this->error(ErrorCode::ARGS_WRONG, '页码不能小于1');
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '页码不能小于1');
         }
         $listRows = $this->request->param('listRows/d', $this->app->config->get('business.pagination.list_rows', 10));
         if($listRows <= 0){
-            return $this->error(ErrorCode::ARGS_WRONG, '分页大小不能小于0');
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '分页大小不能小于0');
         }
         $maxRows = $this->app->config->get('business.pagination.list_max_rows', 100);
         if($listRows > $maxRows){
-            return $this->error(ErrorCode::ARGS_WRONG, '分页大小不能大于' . $maxRows);
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '分页大小不能大于' . $maxRows);
         }
         $option   = $this->request->param('option/s', '');
         if($option){
@@ -44,7 +44,7 @@ class <?=$controllerName?> extends <?=$cBaseName?>
 
             list($action, $isValid) = \app\checkListOption($option);
             if(!$isValid){
-                return $this->error(ErrorCode::ARGS_WRONG, 'option参数校验失败');
+                throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, 'option参数校验失败');
             }
             <?php } ?>
 
@@ -100,8 +100,8 @@ class <?=$controllerName?> extends <?=$cBaseName?>
                 'info' => $<?=$modelInstance?>
 
             ]);
-        } catch (<?=$businessExceptionName?> $e) {
-            return $this->error(ErrorCode::getErrorCode($e, ErrorCode::DB_WRONG), '保存失败', ErrorCode::getErrorMessage($e));
+        } catch (\Throwable $th) {
+            throw new <?=$businessExceptionName?>(ErrorCode::DB_WRONG, '保存失败', $th);
         }
     }
 
@@ -116,7 +116,7 @@ class <?=$controllerName?> extends <?=$cBaseName?>
     public function read(int $id = 0, array $with=null, array $readBy = null)
     {
         if (empty($readBy) && (!$id || (int) $id <= 0)) {
-            return $this->error(ErrorCode::ARGS_WRONG, '参数错误');
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '参数错误');
         }
         if ($id) {
             $<?=$modelInstance?> = <?=$modelAlias?>::with($with)->find((int) $id);
@@ -124,7 +124,7 @@ class <?=$controllerName?> extends <?=$cBaseName?>
             $<?=$modelInstance?> = <?=$modelAlias?>::with($with)->withSearch(<?=$modelAlias?>::$searchFields, $readBy)->find();
         }
         if (!$<?=$modelInstance?>) {
-            return $this->error(ErrorCode::DATA_NOT_FOUND, '数据不存在');
+            throw new <?=$businessExceptionName?>(ErrorCode::DATA_NOT_FOUND, '数据不存在');
         }
         return $this->success($<?=$modelInstance?>);
     }
@@ -138,11 +138,11 @@ class <?=$controllerName?> extends <?=$cBaseName?>
     public function update(int $id = 0)
     {
         if ((!$id || (int) $id <= 0)) {
-            return $this->error(ErrorCode::ARGS_WRONG, '参数错误');
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '参数错误');
         }
         $<?=$modelInstance?> = <?=$modelAlias?>::find((int) $id);
         if (!$<?=$modelInstance?>) {
-            return $this->error(ErrorCode::DATA_NOT_FOUND, '数据不存在');
+            throw new <?=$businessExceptionName?>(ErrorCode::DATA_NOT_FOUND, '数据不存在');
         }
         $data = $this->request->only([
             <?=$updateFieldStr?>
@@ -161,8 +161,8 @@ class <?=$controllerName?> extends <?=$cBaseName?>
                 'info' => $<?=$modelInstance?>
 
             ]);
-        } catch (<?=$businessExceptionName?> $e) {
-            return $this->error(ErrorCode::getErrorCode($e, ErrorCode::DB_WRONG), '保存失败', ErrorCode::getErrorMessage($e));
+        } catch (\Throwable $th) {
+            throw new <?=$businessExceptionName?>(ErrorCode::DB_WRONG, '保存失败', $th);
         }
     }
 
@@ -175,17 +175,17 @@ class <?=$controllerName?> extends <?=$cBaseName?>
     public function delete($id)
     {
         if (empty($id)) {
-            return $this->error(ErrorCode::ARGS_WRONG, '参数错误');
+            throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '参数错误');
         }
         if (!is_array($id)){
             if( (int) $id < 0){
-                return $this->error(ErrorCode::ARGS_WRONG, '参数错误');
+                throw new <?=$businessExceptionName?>(ErrorCode::ARGS_WRONG, '参数错误');
             }
             $id = [ (int)$id ];
         }
         $list = <?=$modelAlias?>::select($id);
         if ($list->isEmpty()) {
-            return $this->error(ErrorCode::DATA_NOT_FOUND, '数据不存在');
+            throw new <?=$businessExceptionName?>(ErrorCode::DATA_NOT_FOUND, '数据不存在');
         }
         $success = [];
         $error   = [];
@@ -198,9 +198,9 @@ class <?=$controllerName?> extends <?=$cBaseName?>
                 $item->tryToDelete();
                 Db::commit();
                 $success[] = $pkID;
-            } catch (\Exception $e) {
+            } catch (\Throwable $th) {
                 Db::rollback();
-                $error[] = ErrorCode::getErrorMessage($e, [
+                $error[] = ErrorCode::getErrorMessage($th, [
                     'id' => $pkID
                 ]);
             }
